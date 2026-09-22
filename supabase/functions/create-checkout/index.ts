@@ -1,7 +1,7 @@
 import Stripe from "npm:stripe@^22";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2025-06-30.basil" });
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!);
 const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 
@@ -36,6 +36,13 @@ Deno.serve(async (req) => {
       line_items,
       shipping_address_collection: { allowed_countries: ["SE", "DK", "NO", "FI", "DE", "NL", "FR"] },
       customer_creation: "always",
+      shipping_options: [{
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: shipping, currency: "eur" },
+          display_name: shipping === 0 ? "Free shipping" : "Standard shipping",
+        },
+      }],
       success_url: (origin || "https://yazoniplay.is-a.dev") + "/success.html?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: (origin || "https://yazoniplay.is-a.dev") + "/catalog.html",
       metadata: { cart: JSON.stringify(items.map((x: { id: number; quantity: number }) => ({ id: Number(x.id), quantity: Math.floor(Number(x.quantity)) }))) },
