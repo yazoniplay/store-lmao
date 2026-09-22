@@ -57,6 +57,16 @@ create policy "Authenticated admins can manage products"
 on public.products for all to authenticated
 using (true) with check (true);
 
+drop policy if exists "Authenticated admins can read orders" on public.orders;
+create policy "Authenticated admins can read orders"
+on public.orders for select to authenticated
+using (true);
+
+drop policy if exists "Authenticated admins can read order items" on public.order_items;
+create policy "Authenticated admins can read order items"
+on public.order_items for select to authenticated
+using (true);
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('product-images', 'product-images', true, 6291456, array['image/png','image/jpeg','image/webp','image/gif'])
 on conflict (id) do update set public = true, file_size_limit = 6291456;
