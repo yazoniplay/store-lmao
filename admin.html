@@ -59,6 +59,10 @@
         <input id="productPrice" type="number" step="0.01" min="0" required placeholder="29.99">
       </label>
 
+      <label>Description
+        <textarea id="productDescription" rows="4" placeholder="Describe what makes this product useful."></textarea>
+      </label>
+
       <label>Product image</label>
       <div class="upload-box" id="uploadBox">
         <input id="productImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
@@ -117,12 +121,12 @@
 <script>
 const PASS_HASH="100653e5beb3d7fb7f6c7a403860ac658b453f10674cf4bcfe6b36a1ed8817a1";
 const DEFAULT_PRODUCTS=[
-{id:1,name:"Everyday Carry Organizer",price:29.99,image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
-{id:2,name:"Minimal Desk Lamp",price:39.99,image:"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=82"},
-{id:3,name:"Travel Essentials Bag",price:24.99,image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
-{id:4,name:"Daily Water Bottle",price:22.99,image:"https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=82"},
-{id:5,name:"Compact Tech Stand",price:19.99,image:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=82"},
-{id:6,name:"Home Storage Tray",price:17.99,image:"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=900&q=82"}
+{id:1,name:"Everyday Carry Organizer",price:29.99,description:"A compact everyday organizer designed to keep your essentials neat and easy to carry.",image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
+{id:2,name:"Minimal Desk Lamp",price:39.99,description:"A clean, minimal desk lamp that adds focused light without taking over your workspace.",image:"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=82"},
+{id:3,name:"Travel Essentials Bag",price:24.99,description:"A practical travel bag for keeping chargers, cables, toiletries and small essentials organized.",image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
+{id:4,name:"Daily Water Bottle",price:22.99,description:"A reusable everyday bottle with a simple design made for school, work and travel.",image:"https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=82"},
+{id:5,name:"Compact Tech Stand",price:19.99,description:"A compact stand for keeping your phone or tech devices at a comfortable viewing angle.",image:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=82"},
+{id:6,name:"Home Storage Tray",price:17.99,description:"A simple storage tray for keeping small everyday items organized around your home.",image:"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=900&q=82"}
 ];
 
 const $=id=>document.getElementById(id);
@@ -196,6 +200,7 @@ function edit(id){
   $("productId").value=product.id;
   $("productName").value=product.name;
   $("productPrice").value=product.price;
+  $("productDescription").value=product.description||"";
   selectedImage=product.image;
   $("previewImage").src=product.image;
   $("imageName").textContent=product.image.indexOf("data:image/")===0?"Uploaded image":"Existing product image";
@@ -324,19 +329,20 @@ $("productForm").addEventListener("submit",function(e){
   const name=$("productName").value.trim();
   const price=Number($("productPrice").value);
   const id=Number($("productId").value);
+  const description=$("productDescription").value.trim();
 
   if(!name){showToast("Enter a product name.");return;}
   if(!Number.isFinite(price)||price<0){showToast("Enter a valid price.");return;}
   if(!selectedImage){showToast("Upload a product image.");return;}
 
-  const productData={name:name,price:price,image:selectedImage};
+  const productData={name:name,price:price,description:description||"A practical everyday product designed with a clean, useful approach.",image:selectedImage};
 
   if(id){
     const index=products.findIndex(function(p){return p.id===id;});
     if(index===-1){showToast("Product no longer exists.");return;}
     products[index]=Object.assign({},products[index],productData);
   } else {
-    products.push({id:Date.now(),name:name,price:price,image:selectedImage});
+    products.push({id:Date.now(),name:name,price:price,description:description||"A practical everyday product designed with a clean, useful approach.",image:selectedImage});
   }
 
   if(persist()){
