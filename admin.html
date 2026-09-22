@@ -31,14 +31,57 @@
     <div class="admin-top">
       <div>
         <p class="eyebrow">Dashboard</p>
-        <h1>Products.</h1>
-        <p class="admin-subtitle">Add, edit and remove products without touching the code.</p>
+        <h1>Store.</h1>
+        <p class="admin-subtitle">Edit products, branding and the storefront from one dashboard.</p>
       </div>
       <div class="admin-actions">
         <button class="button button-dark" id="newProduct" type="button">+ Add product</button>
         <button class="small-button" id="logout" type="button">Log out</button>
       </div>
     </div>
+
+    <section class="admin-form store-settings" id="storeSettings">
+      <div class="editor-heading">
+        <div>
+          <p class="eyebrow">Storefront</p>
+          <h2>Store settings</h2>
+        </div>
+      </div>
+      <label>Store name
+        <input id="storeName" placeholder="Your store name">
+      </label>
+      <label>Announcement
+        <input id="storeAnnouncement" placeholder="Free shipping on orders over €50">
+      </label>
+      <label>Hero eyebrow
+        <input id="heroEyebrow" placeholder="Simple. Clean. Useful.">
+      </label>
+      <label>Hero title
+        <input id="heroTitle" placeholder="Your main headline">
+      </label>
+      <label>Hero description
+        <textarea id="heroText" rows="3" placeholder="A short description of your store."></textarea>
+      </label>
+      <label>Footer description
+        <input id="footerText" placeholder="A short line about your store.">
+      </label>
+      <label>Hero image</label>
+      <div class="upload-box" id="heroUploadBox">
+        <input id="heroImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+        <div class="upload-icon">↑</div>
+        <strong>Upload hero image</strong>
+        <span>Use your own product or brand photo</span>
+        <button class="upload-button" type="button" id="chooseHeroImage">Choose image</button>
+      </div>
+      <div class="image-preview" id="heroImagePreview">
+        <img id="heroPreviewImage" alt="Hero preview">
+        <div><strong>Hero image ready</strong><span id="heroImageName">Uploaded image</span></div>
+        <button class="small-button" type="button" id="removeHeroImage">Remove</button>
+      </div>
+      <div class="editor-actions">
+        <button class="button button-dark" type="button" id="saveSettings">Save store settings</button>
+      </div>
+    </section>
 
     <form class="admin-form product-editor" id="productForm" style="display:none">
       <div class="editor-heading">
@@ -120,18 +163,14 @@
 
 <script>
 const PASS_HASH="100653e5beb3d7fb7f6c7a403860ac658b453f10674cf4bcfe6b36a1ed8817a1";
-const DEFAULT_PRODUCTS=[
-{id:1,name:"Everyday Carry Organizer",price:29.99,description:"A compact everyday organizer designed to keep your essentials neat and easy to carry.",image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
-{id:2,name:"Minimal Desk Lamp",price:39.99,description:"A clean, minimal desk lamp that adds focused light without taking over your workspace.",image:"https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=82"},
-{id:3,name:"Travel Essentials Bag",price:24.99,description:"A practical travel bag for keeping chargers, cables, toiletries and small essentials organized.",image:"https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82"},
-{id:4,name:"Daily Water Bottle",price:22.99,description:"A reusable everyday bottle with a simple design made for school, work and travel.",image:"https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=82"},
-{id:5,name:"Compact Tech Stand",price:19.99,description:"A compact stand for keeping your phone or tech devices at a comfortable viewing angle.",image:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=82"},
-{id:6,name:"Home Storage Tray",price:17.99,description:"A simple storage tray for keeping small everyday items organized around your home.",image:"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=900&q=82"}
-];
+const DEFAULT_PRODUCTS=[];
 
 const $=id=>document.getElementById(id);
 let products=[];
 let selectedImage="";
+let heroImage="";
+const DEFAULT_SETTINGS={name:"FraganceWorld",announcement:"",heroEyebrow:"",heroTitle:"",heroText:"",footerText:"",heroImage:""};
+let settings=Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem("nova-settings")||"{}"));
 let pendingDeleteId=null;
 
 try {
@@ -145,6 +184,17 @@ try {
 async function hash(value){
   const data=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
   return Array.from(new Uint8Array(data)).map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+
+function loadSettings(){
+  $("storeName").value=settings.name||"";
+  $("storeAnnouncement").value=settings.announcement||"";
+  $("heroEyebrow").value=settings.heroEyebrow||"";
+  $("heroTitle").value=settings.heroTitle||"";
+  $("heroText").value=settings.heroText||"";
+  $("footerText").value=settings.footerText||"";
+  heroImage=settings.heroImage||"";
+  if(heroImage){$("heroPreviewImage").src=heroImage;$("heroImageName").textContent="Current hero image";$("heroImagePreview").classList.add("visible");}
 }
 
 function persist(){
@@ -297,6 +347,25 @@ $("adminPassword").addEventListener("keydown",function(e){
   if(e.key==="Enter") $("loginButton").click();
 });
 
+function processHeroImage(file){
+  if(!file)return;
+  if(file.size>8*1024*1024){showToast("Image must be under 8 MB.");return;}
+  const reader=new FileReader();reader.onload=function(){
+    const image=new Image();image.onload=function(){
+      const scale=Math.min(1,1200/Math.max(image.width,image.height));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));const ctx=canvas.getContext("2d");ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      heroImage=canvas.toDataURL("image/jpeg",0.78);$("heroPreviewImage").src=heroImage;$("heroImageName").textContent=file.name;$("heroImagePreview").classList.add("visible");
+    };image.src=reader.result;
+  };reader.readAsDataURL(file);
+}
+$("chooseHeroImage").addEventListener("click",e=>{e.preventDefault();e.stopPropagation();$("heroImageFile").click()});
+$("heroImageFile").addEventListener("change",e=>processHeroImage(e.target.files[0]));
+$("heroUploadBox").addEventListener("click",e=>{if(!e.target.closest("#chooseHeroImage"))$("heroImageFile").click()});
+$("removeHeroImage").addEventListener("click",()=>{heroImage="";$("heroImageFile").value="";$("heroImagePreview").classList.remove("visible")});
+$("saveSettings").addEventListener("click",()=>{
+  settings={name:$("storeName").value.trim()||"FraganceWorld",announcement:$("storeAnnouncement").value.trim(),heroEyebrow:$("heroEyebrow").value.trim(),heroTitle:$("heroTitle").value.trim(),heroText:$("heroText").value.trim(),footerText:$("footerText").value.trim(),heroImage:heroImage};
+  localStorage.setItem("nova-settings",JSON.stringify(settings));showToast("Store settings saved.");
+});
+
 $("newProduct").addEventListener("click",openEditor);
 $("cancelEdit").addEventListener("click",closeEditor);
 $("cancelEditBottom").addEventListener("click",closeEditor);
@@ -378,6 +447,7 @@ document.addEventListener("keydown",function(e){
 });
 
 render();
+loadSettings();
 </script>
 </body>
 </html>
