@@ -16,12 +16,13 @@
   async function saveProduct(product){
     const sb=await ensure(); if(!sb)throw new Error("Backend is not configured.");
     const row={name:product.name,price:Number(product.price),description:product.description||"",category:product.category||"Collection",stock:Math.max(0,Number(product.stock)||0),status:product.status||"Active",badge:product.badge||"None",featured:!!product.featured,images:product.images||[]};
+    const normalize=p=>p?({...p,image:(p.images&&p.images[0])||"",images:Array.isArray(p.images)?p.images:[]}):p;
     if(product.id){
       const {data,error}=await sb.from("products").update(row).eq("id",product.id).select("*").single();
-      if(error)throw error; return data;
+      if(error)throw error; return normalize(data);
     }
     const {data,error}=await sb.from("products").insert(row).select("*").single();
-    if(error)throw error; return data;
+    if(error)throw error; return normalize(data);
   }
   async function deleteProduct(id){
     const sb=await ensure(); if(!sb)throw new Error("Backend is not configured.");
