@@ -1,0 +1,7 @@
+project_id = "YOUR_SUPABASE_PROJECT_ID"
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
