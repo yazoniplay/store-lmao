@@ -66,6 +66,7 @@ function setupGlobal(){
  renderCart();
 }
 function setupCatalog(){
+ if(!document.getElementById("productSearch"))return;
  const input=document.getElementById("productSearch"),tabs=document.querySelectorAll("[data-filter]");
  let filter="all";
  const categories=[...new Set(activeProducts().map(p=>p.category).filter(Boolean))];
