@@ -42,6 +42,12 @@
   }
   async function logout(){if(client)await client.auth.signOut()}
   async function session(){const sb=await ensure();if(!sb)return null;const {data}=await sb.auth.getSession();return data.session}
+  async function orders(){
+    const sb=await ensure(); if(!sb)return null;
+    const {data,error}=await sb.from("orders").select("id,customer_email,subtotal,shipping,total,status,created_at,order_items(*)").order("created_at",{ascending:false}).limit(50);
+    if(error)throw error;
+    return data||[];
+  }
   async function checkout(items){
     const sb=await ensure();if(!sb)throw new Error("Backend is not configured.");
     const {data,error}=await sb.functions.invoke(cfg.checkoutFunction||"create-checkout",{body:{items,origin:location.origin}});
@@ -49,5 +55,5 @@
     if(!data?.url)throw new Error(data?.error||"Checkout could not be started.");
     location.href=data.url;
   }
-  window.VeloraBackend={configured,products,saveProduct,deleteProduct,uploadImage,login,logout,session,checkout};
+  window.VeloraBackend={configured,products,saveProduct,deleteProduct,uploadImage,login,logout,session,orders,checkout};
 })();
