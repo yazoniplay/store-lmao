@@ -125,20 +125,32 @@ const DEFAULT_PRODUCTS=[
 {id:6,name:"Home Storage Tray",price:17.99,image:"https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=900&q=82"}
 ];
 
-let products=JSON.parse(localStorage.getItem("nova-products")||"null")||DEFAULT_PRODUCTS;
+const $=id=>document.getElementById(id);
+let products=[];
 let selectedImage="";
 let pendingDeleteId=null;
 
-const $=id=>document.getElementById(id);
-
-async function hash(v){
-  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));
-  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+try {
+  const stored=localStorage.getItem("nova-products");
+  products=stored?JSON.parse(stored):DEFAULT_PRODUCTS.slice();
+  if(!Array.isArray(products)) products=DEFAULT_PRODUCTS.slice();
+} catch(e) {
+  products=DEFAULT_PRODUCTS.slice();
 }
 
-function save(){
-  localStorage.setItem("nova-products",JSON.stringify(products));
-  render();
+async function hash(value){
+  const data=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(data)).map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+
+function persist(){
+  try {
+    localStorage.setItem("nova-products",JSON.stringify(products));
+    return true;
+  } catch(e) {
+    showToast("Storage is full. Use a smaller image.");
+    return false;
+  }
 }
 
 function showToast(message){
@@ -146,50 +158,53 @@ function showToast(message){
   toast.textContent=message;
   toast.classList.add("show");
   clearTimeout(showToast.timer);
-  showToast.timer=setTimeout(()=>toast.classList.remove("show"),2400);
+  showToast.timer=setTimeout(function(){toast.classList.remove("show")},2400);
+}
+
+function escapeHtml(value){
+  return String(value).replace(/[&<>"']/g,function(char){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[char];
+  });
 }
 
 function render(){
   $("productCount").textContent=products.length+" "+(products.length===1?"product":"products");
-  $("adminProducts").innerHTML=products.length
-    ?products.map(p=>`
-      <article class="admin-product">
-        <div class="admin-product-image"><img src="${p.image}" alt=""></div>
-        <div class="admin-product-info">
-          <h3>${escapeHtml(p.name)}</h3>
-          <p>€${Number(p.price).toFixed(2)}</p>
-        </div>
-        <div class="admin-product-actions">
-          <button class="small-button" data-edit="${p.id}" type="button">Edit</button>
-          <button class="small-button danger" data-delete="${p.id}" type="button">Delete</button>
-        </div>
-      </article>`).join("")
-    :'<div class="empty-products"><strong>No products yet.</strong><span>Add your first product above.</span></div>';
+  if(!products.length){
+    $("adminProducts").innerHTML='<div class="empty-products"><strong>No products yet.</strong><span>Add your first product above.</span></div>';
+    return;
+  }
 
-  document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>edit(Number(b.dataset.edit)));
-  document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>openDelete(Number(b.dataset.delete)));
-}
+  $("adminProducts").innerHTML=products.map(function(p){
+    return '<article class="admin-product">'+
+      '<div class="admin-product-image"><img src="'+p.image+'" alt=""></div>'+
+      '<div class="admin-product-info"><h3>'+escapeHtml(p.name)+'</h3><p>€'+Number(p.price).toFixed(2)+'</p></div>'+
+      '<div class="admin-product-actions"><button class="small-button" data-edit="'+p.id+'" type="button">Edit</button><button class="small-button danger" data-delete="'+p.id+'" type="button">Delete</button></div>'+
+      '</article>';
+  }).join("");
 
-function escapeHtml(value){
-  return String(value).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+  document.querySelectorAll("[data-edit]").forEach(function(button){
+    button.addEventListener("click",function(){edit(Number(button.dataset.edit));});
+  });
+  document.querySelectorAll("[data-delete]").forEach(function(button){
+    button.addEventListener("click",function(){openDelete(Number(button.dataset.delete));});
+  });
 }
 
 function edit(id){
-  const p=products.find(x=>x.id===id);
-  if(!p)return;
-  $("productId").value=p.id;
-  $("productName").value=p.name;
-  $("productPrice").value=p.price;
-  selectedImage=p.image;
-  $("previewImage").src=p.image;
-  $("imageName").textContent=p.image.startsWith("data:")?"Uploaded image":"Existing product image";
+  const product=products.find(function(p){return p.id===id;});
+  if(!product)return;
+  $("productId").value=product.id;
+  $("productName").value=product.name;
+  $("productPrice").value=product.price;
+  selectedImage=product.image;
+  $("previewImage").src=product.image;
+  $("imageName").textContent=product.image.indexOf("data:image/")===0?"Uploaded image":"Existing product image";
   $("imagePreview").classList.add("visible");
   $("productImageFile").value="";
   $("editorEyebrow").textContent="Edit product";
   $("editorTitle").textContent="Update product";
   $("productForm").style.display="grid";
   $("productForm").scrollIntoView({behavior:"smooth",block:"center"});
-  setTimeout(()=>$("productName").focus(),250);
 }
 
 function openEditor(){
@@ -201,7 +216,6 @@ function openEditor(){
   $("editorTitle").textContent="Add a product";
   $("productForm").style.display="grid";
   $("productForm").scrollIntoView({behavior:"smooth",block:"center"});
-  setTimeout(()=>$("productName").focus(),250);
 }
 
 function closeEditor(){
@@ -210,10 +224,10 @@ function closeEditor(){
 }
 
 function openDelete(id){
-  const p=products.find(x=>x.id===id);
-  if(!p)return;
+  const product=products.find(function(p){return p.id===id;});
+  if(!product)return;
   pendingDeleteId=id;
-  $("deleteMessage").textContent='“'+p.name+'” will be permanently removed from this browser.';
+  $("deleteMessage").textContent='"'+product.name+'" will be permanently removed from this browser.';
   $("deleteModal").classList.add("open");
   $("deleteModal").setAttribute("aria-hidden","false");
   document.body.classList.add("modal-open");
@@ -226,117 +240,134 @@ function closeDelete(){
   document.body.classList.remove("modal-open");
 }
 
-function removeSelectedImage(){
-  selectedImage="";
-  $("productImageFile").value="";
-  $("imagePreview").classList.remove("visible");
-}
-
 function processImage(file){
   if(!file)return;
-  if(file.size>4*1024*1024){
-    showToast("Please choose an image under 4 MB.");
+  if(file.size>8*1024*1024){
+    showToast("Image must be under 8 MB.");
     $("productImageFile").value="";
     return;
   }
 
   const reader=new FileReader();
-  reader.onload=()=>{
-    const img=new Image();
-    img.onload=()=>{
-      const max=1400;
-      const scale=Math.min(1,max/Math.max(img.width,img.height));
+  reader.onload=function(){
+    const image=new Image();
+    image.onload=function(){
+      const maxDimension=900;
+      const scale=Math.min(1,maxDimension/Math.max(image.width,image.height));
       const canvas=document.createElement("canvas");
-      canvas.width=Math.max(1,Math.round(img.width*scale));
-      canvas.height=Math.max(1,Math.round(img.height*scale));
-      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
-      selectedImage=canvas.toDataURL("image/jpeg",.84);
+      canvas.width=Math.max(1,Math.round(image.width*scale));
+      canvas.height=Math.max(1,Math.round(image.height*scale));
+      const context=canvas.getContext("2d");
+      context.drawImage(image,0,0,canvas.width,canvas.height);
+
+      selectedImage=canvas.toDataURL("image/jpeg",0.72);
       $("previewImage").src=selectedImage;
       $("imageName").textContent=file.name;
       $("imagePreview").classList.add("visible");
-      showToast("Image uploaded and optimized.");
+      showToast("Image ready.");
     };
-    img.src=reader.result;
+    image.onerror=function(){showToast("That image could not be read.");};
+    image.src=reader.result;
   };
+  reader.onerror=function(){showToast("Could not read the image.");};
   reader.readAsDataURL(file);
 }
 
-$("loginButton").onclick=async()=>{
-  if(await hash($("adminPassword").value)===PASS_HASH){
-    $("loginPanel").style.display="none";
-    $("adminPanel").classList.add("visible");
-    render();
-  }else{
+$("loginButton").addEventListener("click",async function(){
+  try {
+    if(await hash($("adminPassword").value)===PASS_HASH){
+      $("loginPanel").style.display="none";
+      $("adminPanel").classList.add("visible");
+      render();
+    } else {
+      $("loginError").classList.add("visible");
+    }
+  } catch(e) {
+    $("loginError").textContent="Login could not be completed. Refresh and try again.";
     $("loginError").classList.add("visible");
   }
-};
+});
 
-$("adminPassword").onkeydown=e=>{
-  if(e.key==="Enter")$("loginButton").click();
-};
+$("adminPassword").addEventListener("keydown",function(e){
+  if(e.key==="Enter") $("loginButton").click();
+});
 
-$("newProduct").onclick=openEditor;
-$("cancelEdit").onclick=closeEditor;
-$("cancelEditBottom").onclick=closeEditor;
-$("logout").onclick=()=>location.reload();
+$("newProduct").addEventListener("click",openEditor);
+$("cancelEdit").addEventListener("click",closeEditor);
+$("cancelEditBottom").addEventListener("click",closeEditor);
+$("logout").addEventListener("click",function(){location.reload();});
 
-$("productImageFile").onchange=e=>processImage(e.target.files[0]);
-$("chooseImage").onclick=()=>$("productImageFile").click();
-$("removeImage").onclick=removeSelectedImage;
+$("productImageFile").addEventListener("change",function(e){processImage(e.target.files[0]);});
+$("chooseImage").addEventListener("click",function(e){e.preventDefault();e.stopPropagation();$("productImageFile").click();});
 
-$("uploadBox").onclick=e=>{
-  if(e.target.closest("button"))return;
+$("uploadBox").addEventListener("click",function(e){
+  if(e.target.closest("#chooseImage"))return;
   $("productImageFile").click();
-};
-$("uploadBox").ondragover=e=>{
-  e.preventDefault();
-  $("uploadBox").classList.add("dragging");
-};
-$("uploadBox").ondragleave=()=>$("uploadBox").classList.remove("dragging");
-$("uploadBox").ondrop=e=>{
+});
+$("uploadBox").addEventListener("dragover",function(e){e.preventDefault();$("uploadBox").classList.add("dragging");});
+$("uploadBox").addEventListener("dragleave",function(){$("uploadBox").classList.remove("dragging");});
+$("uploadBox").addEventListener("drop",function(e){
   e.preventDefault();
   $("uploadBox").classList.remove("dragging");
   processImage(e.dataTransfer.files[0]);
-};
+});
 
-$("productForm").onsubmit=e=>{
+$("removeImage").addEventListener("click",function(){
+  selectedImage="";
+  $("productImageFile").value="";
+  $("imagePreview").classList.remove("visible");
+});
+
+$("productForm").addEventListener("submit",function(e){
   e.preventDefault();
-  const id=Number($("productId").value);
-  const data={
-    name:$("productName").value.trim(),
-    price:Number($("productPrice").value),
-    image:selectedImage
-  };
 
-  if(!data.image){
-    showToast("Please upload a product image.");
+  const name=$("productName").value.trim();
+  const price=Number($("productPrice").value);
+  const id=Number($("productId").value);
+
+  if(!name){showToast("Enter a product name.");return;}
+  if(!Number.isFinite(price)||price<0){showToast("Enter a valid price.");return;}
+  if(!selectedImage){showToast("Upload a product image.");return;}
+
+  const productData={name:name,price:price,image:selectedImage};
+
+  if(id){
+    const index=products.findIndex(function(p){return p.id===id;});
+    if(index===-1){showToast("Product no longer exists.");return;}
+    products[index]=Object.assign({},products[index],productData);
+  } else {
+    products.push({id:Date.now(),name:name,price:price,image:selectedImage});
+  }
+
+  if(persist()){
+    render();
+    closeEditor();
+    showToast(id?"Product updated.":"Product added.");
+  }
+});
+
+$("cancelDelete").addEventListener("click",closeDelete);
+$("confirmDelete").addEventListener("click",function(){
+  if(pendingDeleteId===null)return;
+
+  const oldLength=products.length;
+  products=products.filter(function(p){return p.id!==pendingDeleteId;});
+
+  if(products.length===oldLength){
+    closeDelete();
+    showToast("Product was not found.");
     return;
   }
 
-  if(id){
-    const i=products.findIndex(p=>p.id===id);
-    if(i>-1)products[i]={...products[i],...data};
-    showToast("Product updated.");
-  }else{
-    products.push({id:Date.now(),...data});
-    showToast("Product added.");
+  if(persist()){
+    render();
+    closeDelete();
+    showToast("Product deleted.");
   }
+});
 
-  save();
-  closeEditor();
-};
-
-$("cancelDelete").onclick=closeDelete;
-$("confirmDelete").onclick=()=>{
-  if(pendingDeleteId===null)return;
-  products=products.filter(p=>p.id!==pendingDeleteId);
-  save();
-  closeDelete();
-  showToast("Product deleted.");
-};
-
-document.querySelectorAll("[data-close-modal]").forEach(el=>el.onclick=closeDelete);
-document.addEventListener("keydown",e=>{
+document.querySelector("[data-close-modal]").addEventListener("click",closeDelete);
+document.addEventListener("keydown",function(e){
   if(e.key==="Escape"&&pendingDeleteId!==null)closeDelete();
 });
 
